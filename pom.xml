@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.5.4</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.lwoptimizer</groupId>
+    <artifactId>lw-optimizer-ui</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+
+    <name>LW Optimizer :: UI</name>
+    <description>
+        REST API and web interface for the LW Optimizer use cases: launch a use case, tune the
+        solver and the constraints, watch the optimization while it runs, reschedule.
+    </description>
+
+    <properties>
+        <java.version>21</java.version>
+        <!-- Built from the lw-optimizer repository with "./mvnw install". -->
+        <lw-optimizer.version>0.1.0-SNAPSHOT</lw-optimizer.version>
+        <springdoc.version>2.8.9</springdoc.version>
+        <leaflet.version>1.9.4</leaflet.version>
+    </properties>
+
+    <dependencies>
+        <!-- The use cases; they bring the optimizer and its engines with them. -->
+        <dependency>
+            <groupId>com.lwoptimizer</groupId>
+            <artifactId>optimizer-usecase-task-assignment</artifactId>
+            <version>${lw-optimizer.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.lwoptimizer</groupId>
+            <artifactId>optimizer-usecase-stock</artifactId>
+            <version>${lw-optimizer.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.lwoptimizer</groupId>
+            <artifactId>optimizer-usecase-cvrp</artifactId>
+            <version>${lw-optimizer.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.lwoptimizer</groupId>
+            <artifactId>optimizer-usecase-carpooling</artifactId>
+            <version>${lw-optimizer.version}</version>
+        </dependency>
+
+        <!-- REST API, its OpenAPI description and Swagger UI. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+            <version>${springdoc.version}</version>
+        </dependency>
+
+        <!-- Map library of the routing screens, served by the application itself. -->
+        <dependency>
+            <groupId>org.webjars</groupId>
+            <artifactId>leaflet</artifactId>
+            <version>${leaflet.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <!-- With "spring-boot:run", pages, styles and scripts are served straight from
+                         src/main/resources: edit and reload, no restart. -->
+                    <addResources>true</addResources>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

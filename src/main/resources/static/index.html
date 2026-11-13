@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LW Optimizer</title>
+  <link rel="stylesheet" href="/webjars/leaflet/1.9.4/leaflet.css">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- Navigation: one entry per use case -->
+  <nav class="rail" aria-label="Use cases">
+    <a class="rail-brand" href="/" title="LW Optimizer">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 8l11 16L27 8" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 8l5 7 5-7" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" opacity=".45"/></svg>
+    </a>
+    <div class="rail-items" id="nav"></div>
+    <a class="rail-link" href="/swagger-ui.html" target="_blank" rel="noopener" title="REST API documentation (Swagger)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5l-5 7 5 7M16 5l5 7-5 7M13.5 4l-3 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>API</span>
+    </a>
+  </nav>
+
+  <!-- Work area -->
+  <main class="main">
+    <header class="top">
+      <div class="top-title">
+        <h1 id="title">&nbsp;</h1>
+        <p id="summary">&nbsp;</p>
+      </div>
+      <div class="top-actions">
+        <div class="score" id="score" aria-live="polite"></div>
+        <button class="btn ghost" id="reset" type="button" title="Discard the current plan and reload the problem">Reset plan</button>
+        <button class="btn primary" id="solve" type="button">Solve</button>
+      </div>
+    </header>
+
+    <div class="banner" id="banner" role="alert" hidden></div>
+
+    <section class="stage" id="stage" aria-label="Plan"></section>
+
+    <!-- The search, replayable: every improvement found is a frame -->
+    <footer class="player" id="player">
+      <button class="icon-btn" id="play" type="button" title="Play / pause" aria-label="Play or pause">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path id="play-icon" d="M7 5v14l12-7z" fill="currentColor"/></svg>
+      </button>
+      <div class="player-track">
+        <svg class="chart" id="chart" preserveAspectRatio="none" aria-hidden="true"></svg>
+        <input type="range" id="scrub" min="0" max="0" value="0" step="1" aria-label="Improvement shown">
+      </div>
+      <div class="player-info">
+        <div id="frame-label">No run yet</div>
+        <div class="muted" id="status">Ready</div>
+      </div>
+      <label class="speed">
+        <span class="muted">Speed</span>
+        <select id="speed">
+          <option value="700">0.5×</option>
+          <option value="350" selected>1×</option>
+          <option value="150">2×</option>
+          <option value="60">5×</option>
+        </select>
+      </label>
+    </footer>
+  </main>
+
+  <!-- Settings, constraints, score -->
+  <aside class="panel" aria-label="Configuration and score">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" data-tab="settings" aria-selected="true">Solver</button>
+      <button class="tab" role="tab" data-tab="constraints" aria-selected="false">Constraints</button>
+      <button class="tab" role="tab" data-tab="analysis" aria-selected="false">Score</button>
+    </div>
+    <div class="tab-body" id="tab-settings" role="tabpanel"></div>
+    <div class="tab-body" id="tab-constraints" role="tabpanel" hidden></div>
+    <div class="tab-body" id="tab-analysis" role="tabpanel" hidden>
+      <h2>Where the score comes from</h2>
+      <div id="analysis"></div>
+      <h2>What just changed</h2>
+      <ol class="feed" id="feed"></ol>
+    </div>
+  </aside>
+</div>
+
+<script src="/webjars/leaflet/1.9.4/leaflet.js"></script>
+<script type="module" src="/js/app.js"></script>
+</body>
+</html>
