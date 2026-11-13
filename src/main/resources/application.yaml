@@ -1,16 +1,23 @@
+# LW Optimizer UI: a front end. It needs the API of lw-optimizer (module optimizer-api).
+
 server:
-  port: 8080
+  port: 8081
 
 spring:
   application:
     name: lw-optimizer-ui
-  jackson:
-    default-property-inclusion: non_null
+  web:
+    resources:
+      cache:
+        cachecontrol:
+          # Pages, styles and scripts are always revalidated: an upgrade is never masked by a stale copy.
+          no-cache: true
 
-springdoc:
-  swagger-ui:
-    path: /swagger-ui.html
-    tags-sorter: alpha
-    operations-sorter: method
-  api-docs:
-    path: /v3/api-docs
+lw:
+  # Address of the LW Optimizer API, as seen from the user's browser.
+  # Override with --lw.api-url=... or the environment variable LW_API_URL.
+  api-url: http://localhost:8080
+
+logging:
+  pattern:
+    console: "%d{HH:mm:ss.SSS} %-5level %-22.22logger{0} %msg%n"

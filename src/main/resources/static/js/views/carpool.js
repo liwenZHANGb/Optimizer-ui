@@ -74,7 +74,7 @@ export function mount(root) {
     };
 
     const waiting = plan.riders.filter((r) => !plan.drivers.some((d) => (d.pickups || []).includes(r.name)));
-    side.replaceChildren(
+    side.replaceChildren(...[
       h('div', { class: 'kpis' },
         h('div', { class: 'kpi' }, h('small', {}, 'Distance driven'), h('b', {}, `${number(plan.totalKm || 0, 1)} km`)),
         h('div', { class: 'kpi' }, h('small', {}, 'Riders with a lift'), h('b', {}, `${plan.riders.length - waiting.length} of ${plan.riders.length}`)),
@@ -83,7 +83,7 @@ export function mount(root) {
       h('div', { class: 'timeline' }, plan.drivers.map(trip)),
       waiting.length > 0 ? h('div', { class: 'card route', style: { 'margin-top': '8px' } },
         h('div', { class: 'route-head' }, h('strong', {}, 'Waiting for a lift')),
-        h('div', { class: 'stops' }, waiting.map((r) => h('span', { class: 'chip', dataset: { key: r.name } }, r.name)))) : null);
+        h('div', { class: 'stops' }, waiting.map((r) => h('span', { class: 'chip', dataset: { key: r.name } }, r.name)))) : null].filter(Boolean));
   }
 
   return {

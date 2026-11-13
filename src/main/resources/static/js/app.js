@@ -32,20 +32,30 @@ const state = {
 };
 
 // ---- API -------------------------------------------------------------------------------------
+// Everything goes through the REST API of lw-optimizer: this page holds no optimization logic.
+// Its address comes from /config.js, written by the server from its lw.api-url setting.
+
+const API = (window.LW_API_URL || 'http://localhost:8080').replace(/\/+$/, '');
 
 async function call(method, path, body) {
-  const response = await fetch(path, {
-    method,
-    headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  let response;
+  try {
+    response = await fetch(path, {
+      method,
+      headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch (error) {
+    throw new Error(`The optimizer API at ${API} cannot be reached. Start it from the lw-optimizer repository `
+      + 'with "./mvnw -pl optimizer-api spring-boot:run", or set its address with lw.api-url.');
+  }
   const text = await response.text();
   const data = text ? JSON.parse(text) : null;
   if (!response.ok) throw new Error(data?.message || `${response.status} ${response.statusText}`);
   return data;
 }
 
-const api = (path) => `/api/${state.useCase.id}${path}`;
+const api = (path) => `${API}/api/${state.useCase.id}${path}`;
 
 /** What is sent to solve or to score: the settings and constraints of the panel, and the plan on screen. */
 const request = (plan) => ({
@@ -297,5 +307,6 @@ $('scrub').addEventListener('input', (event) => {
 });
 window.addEventListener('resize', () => drawChart($('chart'), state.frames, state.shown));
 
+$('api-docs').href = `${API}/swagger-ui.html`;
 select(USE_CASES.find((useCase) => `#${useCase.id}` === location.hash) || USE_CASES[0]);
 tick();

@@ -151,7 +151,7 @@ export function mount(root, ctx) {
       }
     } }, 'Add');
 
-    side.replaceChildren(
+    side.replaceChildren(...[
       h('div', { class: 'kpis' },
         h('div', { class: 'kpi' }, h('small', {}, 'Driving time'), h('b', {}, `${Math.floor((plan.totalMinutes || 0) / 60)} h ${String((plan.totalMinutes || 0) % 60).padStart(2, '0')}`)),
         h('div', { class: 'kpi' }, h('small', {}, 'Distance'), h('b', {}, `${number(plan.totalKm || 0, 1)} km`)),
@@ -164,7 +164,7 @@ export function mount(root, ctx) {
           h('div', { class: 'route-head' }, h('strong', {}, 'Not visited'),
             h('span', { class: 'muted' }, unvisitedNames.length === 0 ? 'everyone is served' : `${unvisitedNames.length} customer${unvisitedNames.length === 1 ? '' : 's'}`)),
           unvisited,
-          editable ? h('div', { class: 'adder' }, address, demand, add) : null)));
+          editable ? h('div', { class: 'adder' }, address, demand, add) : null))].filter(Boolean));
   }
 
   return {
