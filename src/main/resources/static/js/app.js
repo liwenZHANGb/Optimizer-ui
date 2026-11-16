@@ -1,5 +1,6 @@
 import { h } from './util.js';
 import { renderSettings, renderConstraints } from './settings.js';
+import { openRuleBuilder } from './rules.js';
 import { renderScore, renderAnalysis, drawChart } from './score.js';
 import * as tasks from './views/tasks.js';
 import * as stock from './views/stock.js';
@@ -26,7 +27,7 @@ const USE_CASES = [
 
 const $ = (id) => document.getElementById(id);
 const state = {
-  useCase: null, config: null, settings: {}, constraints: [],
+  useCase: null, config: null, settings: {}, constraints: [], vocabulary: null, rules: [],
   frames: [], shown: -1, view: null, job: null, stream: null,
   running: false, playing: true, timer: null,
 };
@@ -99,12 +100,15 @@ async function select(useCase) {
   fail(null);
   $('stage').replaceChildren(h('p', { class: 'muted' }, 'Loading…'));
   try {
-    const [config, plan] = await Promise.all([call('GET', api('/configuration')), call('GET', api('/problem'))]);
+    const [config, plan, vocabulary, rules] = await Promise.all([call('GET', api('/configuration')),
+      call('GET', api('/problem')), call('GET', api('/rules/vocabulary')), call('GET', api('/rules'))]);
     state.config = config;
+    state.vocabulary = vocabulary;
+    state.rules = rules;
     state.settings = { ...config.defaults };
     state.constraints = JSON.parse(JSON.stringify(config.constraints));
     renderSettings($('tab-settings'), config, state.settings, () => {});
-    renderConstraints($('tab-constraints'), state.constraints, config.constraints, rescore);
+    drawConstraints();
     $('stage').replaceChildren();
     state.view = useCase.view.mount($('stage'), {
       editable: () => useCase.editable && !state.running,
@@ -114,6 +118,50 @@ async function select(useCase) {
     });
     $('feed').replaceChildren(h('li', { class: 'empty' }, 'Nothing yet: press Solve.'));
     await present(plan, 'Problem loaded');
+  } catch (error) {
+    fail(error.message);
+  }
+}
+
+// ---- Constraints and user-defined rules ------------------------------------------------------
+
+function drawConstraints() {
+  renderConstraints($('tab-constraints'), state.constraints, state.config.constraints, rescore, {
+    rules: state.rules,
+    onNew: () => openRuleBuilder($('rule-dialog'), {
+      title: state.useCase.title,
+      vocabulary: state.vocabulary,
+      url: api,
+      request: () => request(state.frames[state.shown]?.plan),
+      onActivated: (rule) => reloadConstraints(`The rule "${rule.rule.name}" is active: it now takes part in every optimization.`),
+    }),
+    onRemove: async (constraint) => {
+      if (!window.confirm(`Remove the rule "${constraint.name}"? It will no longer be applied.`)) return;
+      try {
+        await call('DELETE', api(`/rules/${constraint.key}`));
+        await reloadConstraints(`The rule "${constraint.name}" was removed.`);
+      } catch (error) {
+        fail(error.message);
+      }
+    },
+  });
+}
+
+/** The set of constraints changed on the server: reload it, keeping what was tuned in the panel. */
+async function reloadConstraints(message) {
+  try {
+    const [config, rules] = await Promise.all([call('GET', api('/configuration')), call('GET', api('/rules'))]);
+    const tuned = new Map(state.constraints.map((constraint) => [constraint.key, constraint]));
+    state.config = config;
+    state.rules = rules;
+    state.constraints = JSON.parse(JSON.stringify(config.constraints)).map((constraint) => {
+      const mine = tuned.get(constraint.key);
+      return mine ? { ...constraint, enabled: mine.enabled, level: mine.level, weight: mine.weight } : constraint;
+    });
+    drawConstraints();
+    openTab('constraints');
+    await rescore();
+    if (message) notice(message);
   } catch (error) {
     fail(error.message);
   }
@@ -204,6 +252,11 @@ function finish(job) {
   refreshPlayer();
   // Editing becomes possible again: redraw the plan on screen with its handles.
   if (state.shown >= 0) show(state.shown, { animate: false });
+  if (job?.warnings?.length) notice(job.warnings.join(' '));
+  // The job was recorded against the user-defined rules it applied: show their new figures.
+  if (job && state.rules.length) {
+    call('GET', api('/rules')).then((rules) => { state.rules = rules; drawConstraints(); }).catch(() => {});
+  }
 }
 
 function closeStream() {
@@ -285,7 +338,14 @@ function openTab(name) {
 function fail(message) {
   const banner = $('banner');
   banner.hidden = !message;
+  banner.classList.remove('notice');
   banner.textContent = message || '';
+}
+
+/** Something to know that is not an error. */
+function notice(message) {
+  fail(message);
+  $('banner').classList.add('notice');
 }
 
 document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click', () => openTab(tab.dataset.tab)));

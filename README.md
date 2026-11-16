@@ -51,8 +51,9 @@ and add the address of the interface to `lw.api.cors.allowed-origins` on the API
 | | |
 |---|---|
 | **Launch a use case** | Task assignment, vehicle routing, stock management, carpooling: one entry each in the left rail. |
-| **Tune the solver** | The *Solver* tab: engine (genetic algorithm, OR-Tools, Choco where a formulation exists), time limit, stall limit, seed, warm start, and the parameters of the genetic algorithm. Every field starts at its default; *Restore defaults* brings them back. For routing, also where travel times come from: straight line, road network (OpenStreetMap through OSRM) or random bounds. |
-| **Tune the constraints** | The *Constraints* tab: switch each one on or off, choose its nature (hard, medium, soft) and its weight. The score of the plan on screen is updated at once. |
+| **Tune the solver** | The *Solver* tab: engine (genetic algorithm, OR-Tools or Choco, for every use case), time limit, stall limit, seed, warm start, and the parameters of the genetic algorithm. Every field starts at its default; *Restore defaults* brings them back. For routing, also where travel times come from: straight line, road network (OpenStreetMap through OSRM) or random bounds. |
+| **Tune the constraints** | The *Constraints* tab, in two groups: *Rules*, which a plan must follow (hard), and *Objectives*, which it is scored on (medium, soft). Switch each one on or off, choose its nature and its weight; the score of the plan on screen is updated at once. A badge tells the constraints that come with the use case (*Standard*) from those added by a user (*Custom*). |
+| **Add a rule** | *+ New rule* opens the rule builder. Describe the rule in a sentence and press *Interpret*, or build it: what it applies to, the conditions that must hold and the exceptions as blocks combined with AND, OR and NOT, the nature, the weight, the penalty. The *Building blocks* on the right list everything a rule may read; click one to insert it, or drag it into a field. The structured form and its validation are shown as you type; *Test on the current plan* says who breaks the rule and runs a short optimization without and with it; *Activate rule* is available once the test has passed, after ticking a box if there are warnings. The rule then appears among the constraints, with how it behaved in the jobs that applied it, and can be removed there. |
 | **Watch the search** | *Solve* streams every improvement from the API. Items glide to their new place, what moved is listed under *What just changed*, and the score is broken down per constraint under *Where the score comes from*. |
 | **Replay it** | The bar at the bottom holds every improvement of the run: scrub through it, pause, replay, change speed. The curve is the cost over the improvements. |
 | **Reschedule** | Tasks and routing. After a run (or before), drag a task to another employee or a stop to another route or position; click a task or a stop to pin it; *Pin all* or *Pin route* freeze a whole lane. *Solve* then optimizes from the edited plan and leaves what is pinned alone. |
@@ -80,10 +81,15 @@ static/
   css/app.css         the whole look: tokens, layout, components, one section per use case
   js/app.js           controller: API calls, job events, playback, tabs
   js/settings.js      solver and constraint forms, generated from GET /configuration
+  js/rules.js         the rule builder: sentence, blocks, preview, checks, activation
   js/score.js         score, score analysis, cost curve
   js/util.js          DOM helpers, move animation (FLIP), drag and drop
   js/views/           one module per use case: tasks, vrp, stock, carpool (+ the shared map)
 ```
+
+The rule builder decides nothing either: it edits the description of a rule and shows what
+the API answers. Interpretation, validation, test and activation happen on the server, which
+checks everything again when a rule is activated ([RULES.md](../lw-optimizer/docs/RULES.md)).
 
 The interface knows nothing about a use case beyond its view module. Settings, their bounds
 and defaults, and the constraints all come from the API, so a setting added there appears
