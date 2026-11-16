@@ -33,7 +33,10 @@ class UiApplicationTest {
         assertTrue(page.contains("<title>LW Optimizer</title>"));
         assertTrue(page.contains("/config.js"));
 
-        for (String file : new String[] {"/js/app.js", "/js/views/tasks.js", "/js/views/vrp.js", "/js/views/stock.js",
+        assertTrue(page.contains("/js/boot.js"), "theme and language are set before the page is drawn");
+
+        for (String file : new String[] {"/js/app.js", "/js/boot.js", "/js/i18n.js", "/js/lang/en.js", "/js/lang/fr.js",
+                "/js/lang/zh.js", "/js/rules.js", "/js/views/tasks.js", "/js/views/vrp.js", "/js/views/stock.js",
                 "/js/views/carpool.js", "/css/app.css", "/webjars/leaflet/1.9.4/leaflet.js"}) {
             assertEquals(HttpStatus.OK, http.getForEntity(file, String.class).getStatusCode(), file);
         }

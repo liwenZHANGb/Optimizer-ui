@@ -50,13 +50,15 @@ and add the address of the interface to `lw.api.cors.allowed-origins` on the API
 
 | | |
 |---|---|
+| **Choose a language** | English, French or Chinese (Simplified), from the selector at the foot of the left rail. The whole page is reworded in place, a run in progress included; the choice is remembered. Without a choice, the language of the browser applies. |
+| **Choose a theme** | Light or dark, from the button under the language selector. Without a choice, the theme of the system applies. |
 | **Launch a use case** | Task assignment, vehicle routing, stock management, carpooling: one entry each in the left rail. |
 | **Tune the solver** | The *Solver* tab: engine (genetic algorithm, OR-Tools or Choco, for every use case), time limit, stall limit, seed, warm start, and the parameters of the genetic algorithm. Every field starts at its default; *Restore defaults* brings them back. For routing, also where travel times come from: straight line, road network (OpenStreetMap through OSRM) or random bounds. |
 | **Tune the constraints** | The *Constraints* tab, in two groups: *Rules*, which a plan must follow (hard), and *Objectives*, which it is scored on (medium, soft). Switch each one on or off, choose its nature and its weight; the score of the plan on screen is updated at once. A badge tells the constraints that come with the use case (*Standard*) from those added by a user (*Custom*). |
 | **Add a rule** | *+ New rule* opens the rule builder. Describe the rule in a sentence and press *Interpret*, or build it: what it applies to, the conditions that must hold and the exceptions as blocks combined with AND, OR and NOT, the nature, the weight, the penalty. The *Building blocks* on the right list everything a rule may read; click one to insert it, or drag it into a field. The structured form and its validation are shown as you type; *Test on the current plan* says who breaks the rule and runs a short optimization without and with it; *Activate rule* is available once the test has passed, after ticking a box if there are warnings. The rule then appears among the constraints, with how it behaved in the jobs that applied it, and can be removed there. |
 | **Watch the search** | *Solve* streams every improvement from the API. Items glide to their new place, what moved is listed under *What just changed*, and the score is broken down per constraint under *Where the score comes from*. |
 | **Replay it** | The bar at the bottom holds every improvement of the run: scrub through it, pause, replay, change speed. The curve is the cost over the improvements. |
-| **Reschedule** | Tasks and routing. After a run (or before), drag a task to another employee or a stop to another route or position; click a task or a stop to pin it; *Pin all* or *Pin route* freeze a whole lane. *Solve* then optimizes from the edited plan and leaves what is pinned alone. |
+| **Reschedule** | Tasks and routing. After a run (or before), drag a task to another employee or a stop to another route or position; click a task or a stop to pin it; *Pin all* or *Pin route* freeze a whole lane. *Solve* then optimizes from the edited plan and leaves what is pinned alone. An edit shows at once and is scored by the API right after; one the API refuses is undone. *Reset plan* brings the ready-made problem back and keeps the settings and constraints of the panel. |
 | **Add a customer by address** | Routing: type an address under *Not visited*; it is geocoded with OpenStreetMap (Nominatim) and added to the plan. |
 
 Each use case has its own screen:
@@ -78,8 +80,11 @@ of Spring Boot. No framework and no build step: edit a file and reload the page.
 ```
 static/
   index.html          the shell: rail, plan area, playback bar, side panel
-  css/app.css         the whole look: tokens, layout, components, one section per use case
-  js/app.js           controller: API calls, job events, playback, tabs
+  css/app.css         the whole look: theme tokens (dark and light), layout, components, one section per use case
+  js/boot.js          sets the theme and the language before the page is drawn
+  js/i18n.js          the three languages: lookup, plurals, wording of the API's messages
+  js/lang/            en.js (the reference), fr.js, zh.js
+  js/app.js           controller: API calls, job events, playback, tabs, language and theme
   js/settings.js      solver and constraint forms, generated from GET /configuration
   js/rules.js         the rule builder: sentence, blocks, preview, checks, activation
   js/score.js         score, score analysis, cost curve
@@ -101,6 +106,37 @@ and `diff(previous, next)`, which lists what changed in words.
 
 The map tiles come from `tile.openstreetmap.org`; without a network the markers and routes
 still show on a blank background. Leaflet itself is served locally.
+
+## Languages
+
+Every text of the page is looked up by key in `js/lang/<language>.js`. English is the
+reference; a key missing elsewhere falls back to it.
+
+- **Texts of the page** are read with `t('key', {values})`. An entry with `one` and `other`
+  is a plural, chosen with its `count`.
+- **Texts the API gives in English** are translated by a key derived from their identifier,
+  and shown as the API wrote them when a language has no entry: the settings
+  (`field.solver.engine`, `field.solver.engine.help`), the groups, the names of the standard
+  constraints (`constraint.vehicle-capacity`), the vocabulary of the rules
+  (`vocab.vrp.Vehicle.load`), and the messages that come with a code: findings about a rule
+  (`finding.*`, `syntax.*`), interpreter notes and problems (`note.*`, `problem.*`), job
+  warnings (`warning.*`).
+- **Not translated**, on purpose: the rule language (`ENTITY`, `MAX`, `visitCount(v)`), the
+  names in the data (employees, towns), scores as the optimizer writes them
+  (`0hard/-120soft`), the detail of a refusal by the API, which follows a translated lead-in,
+  and the sentences a rule is described with, which the interpreter reads in English.
+
+To add a language: copy `en.js`, translate it, add the texts of the API from `fr.js`,
+register the file in `js/i18n.js` (`DICTIONARIES`, `LOCALES`, `LANGUAGES`) and its code in
+`js/boot.js`. `LanguagesTest` fails if a language misses a text, or if a script asks for a
+text that does not exist.
+
+## Themes
+
+Every colour is a token defined twice at the top of `css/app.css`, for the dark theme and
+for the light one; nothing else in the stylesheet names a colour (`LanguagesTest` checks it).
+What is drawn outside CSS, the cost curve and the routes on the map, reads the same tokens,
+so a new theme is one more block of tokens.
 
 ## Settings
 

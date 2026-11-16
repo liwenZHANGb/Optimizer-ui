@@ -1,7 +1,7 @@
 import { h } from '../util.js';
 
-// A Leaflet map on OpenStreetMap tiles, shared by the routing screens. Tiles are darkened in
-// CSS to sit on the navy surface; without a network the markers and routes still show.
+// A Leaflet map on OpenStreetMap tiles, shared by the routing screens. In the dark theme the
+// tiles are darkened in CSS; without a network the markers and routes still show.
 
 /* global L */
 export function createMap(el) {
@@ -25,6 +25,7 @@ export function createMap(el) {
       map.fitBounds(L.latLngBounds(points), { padding: [28, 28] });
     },
     resize() { map.invalidateSize(); },
+    remove() { map.remove(); },
   };
 }
 
@@ -37,7 +38,8 @@ export function siteMarker(latlng, { cls = '', colour = null, size = 14, label =
     html: h('div', { class: `site ${cls}`, style: { width: `${size}px`, height: `${size}px`, ...(colour ? { '--c': colour } : {}) } }).outerHTML,
   });
   const marker = L.marker(latlng, { icon, keyboard: false });
-  if (label) marker.bindTooltip(label, { direction: 'top', offset: [0, -size / 2] });
+  // The label carries names from the plan: it is given as an element, so that it is shown as text and never read as HTML.
+  if (label) marker.bindTooltip(h('span', {}, label), { direction: 'top', offset: [0, -size / 2] });
   return marker;
 }
 

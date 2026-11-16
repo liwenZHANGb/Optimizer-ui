@@ -32,8 +32,39 @@ export function clock(minutes) {
   return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 }
 
-export const number = (value, digits = 0) =>
-  Number(value).toLocaleString('en-GB', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+export { number } from './i18n.js';
+
+/** The value of a colour token of the current theme, for what is drawn outside CSS (SVG, the map). */
+export const token = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+/** Replaces the content of an element; nested lists are flattened and empty entries left out. */
+export function fill(el, ...children) {
+  el.replaceChildren(...children.flat(Infinity)
+    .filter((child) => child !== null && child !== undefined && child !== false)
+    .map((child) => (child.nodeType ? child : document.createTextNode(String(child)))));
+  return el;
+}
+
+/**
+ * Redraws with `draw` and gives the keyboard focus back to the control that had it: a redraw
+ * replaces the elements, and focus would otherwise fall back to the page. Controls are
+ * matched by their data-focus attribute.
+ */
+export function keepFocus(root, draw) {
+  const active = document.activeElement;
+  const key = active && root.contains(active) ? active.dataset.focus : null;
+  draw();
+  if (key) root.querySelector(`[data-focus="${CSS.escape(key)}"]`)?.focus({ preventScroll: true });
+}
+
+/** Calls `fn` once things have been quiet for `delay` ms. */
+export function debounce(fn, delay) {
+  let timer = null;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
+  };
+}
 
 const LOCK_PATH = 'M3 5V3.5a3 3 0 016 0V5h.5a1 1 0 011 1v4a1 1 0 01-1 1h-7a1 1 0 01-1-1V6a1 1 0 011-1zm1.5 0h3V3.5a1.5 1.5 0 00-3 0z';
 export function lockIcon() {
