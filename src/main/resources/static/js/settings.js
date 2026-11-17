@@ -2,6 +2,23 @@ import { h, keepFocus } from './util.js';
 import { t, tApi } from './i18n.js';
 import { weightText } from './score.js';
 
+/** The setting that chooses the engine. */
+export const ENGINE = 'solver.engine';
+
+/**
+ * Engines kept for benchmarking only: they solve a fixed mathematical formulation of the
+ * problem and know nothing of the configurable constraints nor of user-defined rules.
+ */
+export const BENCHMARK_ENGINES = ['ortools', 'choco'];
+
+/** The benchmark engine the settings choose, or null when the engine works from the constraints. */
+export const benchmarkEngine = (values) => (BENCHMARK_ENGINES.includes(values?.[ENGINE]) ? values[ENGINE] : null);
+
+/** An ⓘ that explains itself on hover and on keyboard focus. */
+function info(text) {
+  return h('span', { class: 'info', tabindex: 0, role: 'note', 'aria-label': text, 'data-tip': text }, 'i');
+}
+
 /**
  * The solver form, generated from the fields the API describes: each field knows its type,
  * its bounds and when it applies (the genetic algorithm settings only show for that engine).
@@ -51,10 +68,16 @@ export function renderSettings(el, config, values, onChange) {
     } else {
       control = h('input', { id, dataset: { focus: id }, type: 'text', value: values[field.key] ?? '', oninput: (e) => set(e.target.value) });
     }
+    const isEngine = field.key === ENGINE;
+    const benchmark = isEngine ? benchmarkEngine(values) : null;
     const wrapper = h('div', { class: `field ${changed() ? 'changed' : ''}` },
-      h('label', { for: id, 'data-edited': t('settings.edited') }, label),
+      h('div', { class: 'field-label' },
+        h('label', { for: id, 'data-edited': t('settings.edited') }, label),
+        isEngine ? info(t('engine.benchmark.tip')) : null),
       h('div', { class: 'control' }, control, field.unit ? h('span', { class: 'unit' }, tApi(`unit.${field.unit}`, field.unit)) : null),
-      field.help ? h('div', { class: 'help' }, tApi(`field.${field.key}.help`, field.help)) : null);
+      field.help ? h('div', { class: 'help' }, tApi(`field.${field.key}.help`, field.help)) : null,
+      benchmark ? h('div', { class: 'field-note', role: 'status' },
+        t('engine.benchmark.note', { engine: tApi(`engine.${benchmark}`, benchmark) })) : null);
     return wrapper;
   };
 
@@ -70,28 +93,38 @@ export function renderSettings(el, config, values, onChange) {
  * @param extras.rules    the user-defined rules as the API lists them, with their monitoring figures
  * @param extras.onNew    opens the rule builder
  * @param extras.onRemove removes a user-defined rule, given its constraint
+ * @param extras.locked   why the constraints cannot be configured now (a benchmark engine is
+ *                        chosen), or null: when set, the panel is shown read-only with that reason
  */
 export function renderConstraints(el, constraints, defaults, onChange, extras = {}) {
   const stored = new Map((extras.rules || []).map((rule) => [rule.rule.key, rule]));
   const name = (constraint) => (constraint.custom ? constraint.name : tApi(`constraint.${constraint.key}`, constraint.name));
+  const locked = extras.locked || null;
 
   const draw = () => keepFocus(el, () => {
     el.replaceChildren();
     el.append(h('div', { class: 'panel-actions' },
-      extras.onNew ? h('button', { class: 'btn primary small', type: 'button', dataset: { focus: 'new' }, onclick: extras.onNew }, t('rules.new')) : null,
+      extras.onNew ? h('button', {
+        class: 'btn primary small', type: 'button', dataset: { focus: 'new' }, onclick: extras.onNew,
+        disabled: Boolean(locked), title: locked ? t('rules.new.locked') : null,
+      }, t('rules.new')) : null,
       h('button', {
-        class: 'btn ghost small', type: 'button', dataset: { focus: 'restore' },
+        class: 'btn ghost small', type: 'button', dataset: { focus: 'restore' }, disabled: Boolean(locked),
         onclick: () => { constraints.splice(0, constraints.length, ...JSON.parse(JSON.stringify(defaults))); onChange(); draw(); },
       }, t('action.restore'))));
+    if (locked) el.append(h('div', { class: 'locked-note', role: 'status' }, h('strong', {}, t('constraints.locked.title')), ' ', locked));
+    // A disabled fieldset disables every control in it at once; the rule details still open.
+    const set = h('fieldset', { class: 'constraint-set', disabled: Boolean(locked) });
     const groups = [
       ['constraints.rules', 'constraints.rules.help', constraints.filter((c) => c.level === 'hard')],
       ['constraints.objectives', 'constraints.objectives.help', constraints.filter((c) => c.level !== 'hard')],
     ];
     for (const [title, help, members] of groups) {
-      el.append(h('h2', {}, `${t(title)} (${members.length})`), h('p', { class: 'muted group-help' }, t(help)));
-      members.forEach((constraint) => el.append(row(constraint)));
-      if (!members.length) el.append(h('p', { class: 'muted' }, t('constraints.none')));
+      set.append(h('h2', {}, `${t(title)} (${members.length})`), h('p', { class: 'muted group-help' }, t(help)));
+      members.forEach((constraint) => set.append(row(constraint)));
+      if (!members.length) set.append(h('p', { class: 'muted' }, t('constraints.none')));
     }
+    el.append(set);
   });
 
   const monitoring = (rule) => {

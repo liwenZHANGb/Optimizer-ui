@@ -1,12 +1,18 @@
 import { h, fill, debounce, number } from './util.js';
 import { t, tApi, tMessage, translatePage, onLanguageChange, setLanguage, language, LANGUAGES } from './i18n.js';
-import { renderSettings, renderConstraints } from './settings.js';
+import { renderSettings, renderConstraints, benchmarkEngine, ENGINE } from './settings.js';
 import { openRuleBuilder } from './rules.js';
 import { renderScore, renderAnalysis, drawChart } from './score.js';
 import * as tasks from './views/tasks.js';
 import * as stock from './views/stock.js';
 import * as vrp from './views/vrp.js';
 import * as carpool from './views/carpool.js';
+import * as jobshop from './views/jobshop.js';
+import * as timetable from './views/timetable.js';
+import * as stocksizing from './views/stocksizing.js';
+import * as bltasp from './views/bltasp.js';
+import * as blvrp from './views/blvrp.js';
+import { openImport } from './import.js';
 
 // The controller: one use case at a time, a plan on screen, a job streaming improvements.
 // Every improvement is kept as a frame, so the search can be watched live and replayed.
@@ -14,6 +20,8 @@ import * as carpool from './views/carpool.js';
 // Nothing on screen is kept as text: status, banner and feed are kept as what they say, and
 // worded when drawn, so that changing the language rewords the whole page in place.
 
+// Use cases without a group are demonstrations; those of the 'real' group come from real
+// projects, and are listed apart under their own heading.
 const USE_CASES = [
   { id: 'task-assignment', view: tasks, editable: true,
     icon: 'M4 6h10M4 12h7M4 18h12M18 5v4m-2-2h4M17 15l2 2 3-4' },
@@ -23,6 +31,16 @@ const USE_CASES = [
     icon: 'M4 20V10m6 10V4m6 16v-7m4 7H2' },
   { id: 'carpooling', view: carpool, editable: false,
     icon: 'M5 16l1.5-5.5A2 2 0 018.4 9h7.2a2 2 0 011.9 1.5L19 16M4 16h16v3H4zM7.5 19v1.5m9-1.5v1.5M9 5.5a1.5 1.5 0 103 0 1.5 1.5 0 00-3 0' },
+  { id: 'job-shop', view: jobshop, editable: false,
+    icon: 'M4 4v16M7 7h8M10 12h9M7 17h6' },
+  { id: 'timetabling', view: timetable, editable: false,
+    icon: 'M5 6h14v13H5zM5 10h14M9 4v3m6-3v3M9 14h2m3 0h2' },
+  { id: 'stock-sizing', group: 'real', view: stocksizing, editable: false,
+    icon: 'M4 20h16M6 20V9m4 11V5m4 15v-8m4 8V7M3 14h18' },
+  { id: 'bloptim-tasp', group: 'real', view: bltasp, editable: false,
+    icon: 'M4 5h16v15H4zM4 9h16M8 3v4m8-4v4M7 13h5m-5 3h8' },
+  { id: 'bloptim-vrp', group: 'real', view: blvrp, editable: false,
+    icon: 'M12 21s-6-5.6-6-10.5A6 6 0 0118 10.5C18 15.4 12 21 12 21zM12 12.5a2 2 0 100-4 2 2 0 000 4z' },
 ];
 const SUN = 'M12 4V2m0 20v-2m8-8h2M2 12h2m13.7-5.7l1.4-1.4M4.9 19.1l1.4-1.4m0-11.4L4.9 4.9m14.2 14.2l-1.4-1.4M12 16a4 4 0 100-8 4 4 0 000 8z';
 const MOON = 'M20 14.5A8 8 0 019.5 4 8 8 0 1020 14.5z';
@@ -32,6 +50,9 @@ const state = {
   useCase: null, config: null, settings: {}, constraints: [], vocabulary: null, rules: [],
   frames: [], shown: -1, view: null, job: null, stream: null,
   running: false, starting: false, playing: true, finished: null,
+  // The run as it executes, for the progress bar: when it started (page clock), its time limit,
+  // and once over, how it ended and how long it took. Null when no run is on screen.
+  run: null,
   // Guards against answers that arrive late: a use case selection, and an analysis, are numbered.
   epoch: 0, analysis: 0,
   status: () => '', banner: null, feed: [],
@@ -108,11 +129,22 @@ function icon(path) {
   return svg;
 }
 
+const NAV_GROUPS = { real: { label: 'nav.real', title: 'nav.real.title' } };
+
 function renderNav() {
-  fill($('nav'), USE_CASES.map((useCase) => h('button', {
+  const item = (useCase) => h('button', {
     class: 'rail-item', type: 'button', 'aria-current': useCase === state.useCase ? 'page' : null,
     title: t(`usecase.${useCase.id}.title`), onclick: () => select(useCase),
-  }, icon(useCase.icon), h('span', {}, t(`usecase.${useCase.id}.label`)))));
+  }, icon(useCase.icon), h('span', {}, t(`usecase.${useCase.id}.label`)));
+  const ungrouped = USE_CASES.filter((useCase) => !useCase.group);
+  fill($('nav'), ungrouped.map(item), Object.entries(NAV_GROUPS).map(([id, group]) => {
+    const members = USE_CASES.filter((useCase) => useCase.group === id);
+    if (!members.length) return null;
+    const heading = `nav-group-${id}`;
+    return h('div', { class: 'rail-group', role: 'group', 'aria-labelledby': heading },
+      h('div', { class: 'rail-group-label', id: heading, title: t(group.title) }, t(group.label)),
+      members.map(item));
+  }));
 }
 
 function renderHeader() {
@@ -150,6 +182,7 @@ function reword() {
   if (state.config) {
     renderSettings($('tab-settings'), state.config, state.settings, settingChanged);
     drawConstraints();
+    renderConstraintsTab();
   }
   if (state.view) {
     // Views build their own texts: mount a fresh one on the plan that is on screen.
@@ -207,6 +240,7 @@ function abandonRun() {
   setRunning(false);
   state.job = null;
   state.finished = null;
+  state.run = null;
   if (job) call('DELETE', job).catch(() => {});
 }
 
@@ -249,6 +283,7 @@ async function select(useCase) {
     state.constraints = JSON.parse(JSON.stringify(config.constraints));
     renderSettings($('tab-settings'), config, state.settings, settingChanged);
     drawConstraints();
+    renderConstraintsTab();
     mountView();
     await present(plan, () => t('status.loaded'));
   } catch (error) {
@@ -277,14 +312,42 @@ async function resetPlan() {
   }
 }
 
+/** Opens the import dialog; the plan read from the files replaces the one on screen. */
+function importData() {
+  if (!state.useCase || !state.config) return;
+  const address = base();
+  const epoch = state.epoch;
+  openImport($('rule-dialog'), {
+    useCase: state.useCase.id,
+    url: (path) => `${address}${path}`,
+    onImported: async (plan, files) => {
+      if (epoch !== state.epoch) return;
+      abandonRun();
+      state.feed = [];
+      renderFeed();
+      try {
+        fail(null);
+        await present(plan, () => t('status.imported', { files: files.join(', ') }));
+      } catch (error) {
+        if (epoch === state.epoch) fail(error);
+      }
+    },
+  });
+}
+
 // ---- Constraints and user-defined rules ------------------------------------------------------
+
+/** The benchmark engine chosen in the solver settings, if any: it does not support configurable constraints. */
+const benchmark = () => benchmarkEngine(state.settings);
 
 function drawConstraints() {
   const useCase = state.useCase;
   const address = base();
+  const engine = benchmark();
   renderConstraints($('tab-constraints'), state.constraints, state.config.constraints, rescoreSoon, {
     rules: state.rules,
-    onNew: () => openRuleBuilder($('rule-dialog'), {
+    locked: engine ? t('constraints.locked', { engine: tApi(`engine.${engine}`, engine) }) : null,
+    onNew: () => !benchmark() && openRuleBuilder($('rule-dialog'), {
       useCase: useCase.id,
       vocabulary: state.vocabulary,
       url: (path) => `${address}${path}`,
@@ -292,6 +355,7 @@ function drawConstraints() {
       onActivated: (rule) => reloadConstraints(() => t('rules.activated', { name: rule.rule.name })),
     }),
     onRemove: async (constraint) => {
+      if (benchmark()) return;
       if (!window.confirm(t('rules.remove.confirm', { name: constraint.name }))) return;
       try {
         await call('DELETE', `${address}/rules/${encodeURIComponent(constraint.key)}`);
@@ -328,6 +392,19 @@ async function reloadConstraints(message) {
 /** A setting of the panel changed. Those of the problem itself change what the plan on screen is worth. */
 function settingChanged(key) {
   if (key === null || key.startsWith('problem.')) rescoreSoon();
+  // The engine decides whether the constraints can be configured at all.
+  if (key === null || key === ENGINE) {
+    drawConstraints();
+    renderConstraintsTab();
+  }
+}
+
+/** The Constraints tab says so when the chosen engine leaves the constraints read-only. */
+function renderConstraintsTab() {
+  const tab = document.querySelector('.tab[data-tab="constraints"]');
+  const engine = state.config ? benchmark() : null;
+  tab.classList.toggle('locked', Boolean(engine));
+  tab.title = engine ? t('constraints.locked.tab', { engine: tApi(`engine.${engine}`, engine) }) : '';
 }
 
 // ---- Showing a plan that is not part of a run: the problem, or a plan edited by hand ---------
@@ -347,6 +424,7 @@ async function present(plan, status) {
   state.shown = -1;
   state.job = null;
   state.finished = null;
+  state.run = null;
   show(0, { animate: true });
   setStatus(status);
   return true;
@@ -365,6 +443,7 @@ async function edited(plan) {
   state.shown = -1;
   state.job = null;
   state.finished = null;
+  state.run = null;
   show(0, { animate: true });
   pushFeed(before.plan, plan, () => t('feed.byHand'));
   setStatus(() => t('status.edited'));
@@ -427,6 +506,10 @@ async function solve() {
     state.frames = [];
     state.shown = -1;
     state.finished = null;
+    // The job runs from now: progress is time spent against the time limit, whether or not the
+    // search finds anything better meanwhile.
+    const limit = Number(state.settings['solver.termination.timeLimit']);
+    state.run = { started: performance.now(), limitMs: limit > 0 ? limit * 1000 : null, outcome: 'running', elapsedMs: null };
     state.feed = [];
     renderFeed();
     setRunning(true);
@@ -448,14 +531,14 @@ async function solve() {
       stream.close();
       if (!mine()) return;
       const failed = JSON.parse(event.data);
-      finish(null);
+      finish(null, 'failed');
       fail(() => `${t('error.job')} ${failed.error}`);
     });
     // An EventSource reconnects by itself and would replay the job from its start: close it for good.
     stream.onerror = () => {
       stream.close();
       if (mine() && state.running) {
-        finish(null);
+        finish(null, 'failed');
         fail(() => t('error.connection'));
       }
     };
@@ -476,10 +559,16 @@ async function stop() {
   }
 }
 
-function finish(job) {
+function finish(job, outcome) {
   closeStream();
   setRunning(false);
   state.finished = job ? { engine: job.engine, reason: job.terminationReason } : { stopped: true };
+  if (state.run) {
+    // The execution is over: the bar is full, and the time is the server's own when it gave it.
+    const measured = performance.now() - state.run.started;
+    state.run.elapsedMs = Number.isFinite(job?.best?.elapsedMs) ? job.best.elapsedMs : measured;
+    state.run.outcome = outcome || (job?.terminationReason === 'TERMINATED_EARLY' ? 'stopped' : 'done');
+  }
   refreshPlayer();
   // Editing becomes possible again: redraw the plan on screen with its handles.
   if (state.shown >= 0 && !replaying()) redraw();
@@ -574,6 +663,7 @@ function refreshPlayer() {
   scrub.value = Math.max(0, state.shown);
   scrub.disabled = count < 2;
   $('reset').disabled = state.running || state.starting;
+  $('import').disabled = state.running || state.starting || !state.config;
   drawChart($('chart'), state.frames, state.shown);
   const frame = state.frames[state.shown];
   $('frame-label').textContent = !frame ? (state.running ? t('player.waiting') : t('player.none'))
@@ -581,7 +671,43 @@ function refreshPlayer() {
     : t('player.frame', { index: state.shown, last: count - 1, step: number(frame.step), seconds: number(frame.elapsedMs / 1000, 2) });
   const behind = count - 1 - state.shown;
   $('status').textContent = statusText(behind);
+  renderProgress();
   $('play-icon').setAttribute('d', state.playing && behind > 0 ? 'M7 5h4v14H7zm6 0h4v14h-4z' : 'M7 5v14l12-7z');
+}
+
+// ---- Progress of the execution ---------------------------------------------------------------
+// The bar measures time spent against the time limit, not improvement: it keeps moving while
+// the search finds nothing better, and is full once the job is over, however it ended.
+
+const OUTCOMES = {
+  running: () => t('progress.running'),
+  done: () => t('progress.done'),
+  stopped: () => t('progress.stopped'),
+  failed: () => t('progress.failed'),
+};
+
+function renderProgress() {
+  const run = state.run;
+  const box = $('progress');
+  box.hidden = !run;
+  if (!run) return;
+  const over = run.outcome !== 'running';
+  const elapsed = over ? run.elapsedMs : performance.now() - run.started;
+  // While running the bar stops short of full: the job may need a moment past its limit to end.
+  const percent = over ? 100 : run.limitMs ? Math.min(99, (elapsed / run.limitMs) * 100) : null;
+  box.dataset.outcome = run.outcome;
+  box.classList.toggle('indeterminate', percent === null);
+  $('progress-state').textContent = OUTCOMES[run.outcome]();
+  const seconds = number(elapsed / 1000, 1);
+  $('progress-time').textContent = run.limitMs && !over
+    ? t('progress.time', { elapsed: seconds, limit: number(run.limitMs / 1000) })
+    : t('progress.elapsed', { elapsed: seconds });
+  $('progress-percent').textContent = percent === null ? '' : `${number(Math.floor(percent))} %`;
+  $('progress-fill').style.width = percent === null ? '' : `${percent}%`;
+  const bar = $('progress-bar');
+  bar.setAttribute('aria-label', t('progress.label'));
+  if (percent === null) bar.removeAttribute('aria-valuenow'); else bar.setAttribute('aria-valuenow', String(Math.floor(percent)));
+  bar.setAttribute('aria-valuetext', `${$('progress-state').textContent} · ${$('progress-time').textContent}`);
 }
 
 /** Advances the display towards the latest frame, skipping ahead when the search outruns it. */
@@ -611,6 +737,7 @@ function openTab(name) {
 document.querySelectorAll('.tab').forEach((tab) => tab.addEventListener('click', () => openTab(tab.dataset.tab)));
 $('solve').addEventListener('click', solve);
 $('reset').addEventListener('click', resetPlan);
+$('import').addEventListener('click', importData);
 $('play').addEventListener('click', () => {
   // At the end of a finished run, play starts the replay over.
   if (!state.running && state.shown >= state.frames.length - 1 && state.frames.length > 1) {
@@ -630,6 +757,11 @@ $('language').addEventListener('change', (event) => setLanguage(event.target.val
 $('theme').addEventListener('click', () => setTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light'));
 window.addEventListener('resize', () => drawChart($('chart'), state.frames, state.shown));
 onLanguageChange(reword);
+// An address typed or followed with another use case in it (#vrp) opens that use case.
+window.addEventListener('hashchange', () => {
+  const wanted = USE_CASES.find((useCase) => `#${useCase.id}` === location.hash);
+  if (wanted && wanted !== state.useCase) select(wanted);
+});
 
 $('api-docs').href = `${API}/swagger-ui.html`;
 translatePage();
@@ -637,3 +769,5 @@ renderPrefs();
 renderSolve();
 select(USE_CASES.find((useCase) => `#${useCase.id}` === location.hash) || USE_CASES[0]);
 tick();
+// The clock of a run moves on its own, improvement or not.
+setInterval(() => { if (state.run?.outcome === 'running') renderProgress(); }, 100);

@@ -52,8 +52,9 @@ and add the address of the interface to `lw.api.cors.allowed-origins` on the API
 |---|---|
 | **Choose a language** | English, French or Chinese (Simplified), from the selector at the foot of the left rail. The whole page is reworded in place, a run in progress included; the choice is remembered. Without a choice, the language of the browser applies. |
 | **Choose a theme** | Light or dark, from the button under the language selector. Without a choice, the theme of the system applies. |
-| **Launch a use case** | Task assignment, vehicle routing, stock management, carpooling: one entry each in the left rail. |
-| **Tune the solver** | The *Solver* tab: engine (genetic algorithm, OR-Tools or Choco, for every use case), time limit, stall limit, seed, warm start, and the parameters of the genetic algorithm. Every field starts at its default; *Restore defaults* brings them back. For routing, also where travel times come from: straight line, road network (OpenStreetMap through OSRM) or random bounds. |
+| **Launch a use case** | Task assignment, vehicle routing, stock management, carpooling, job shop scheduling, academic timetabling, stock sizing, BL.Optim TASP and VRP: one entry each in the left rail. |
+| **Import your data** | *Import data* opens a dialog that lists the tables and columns the use case reads, offers an example workbook (.xlsx) and example CSV files, and takes your files by selection or by drop. The data replaces the plan on screen; an error names the table, the row and the column. |
+| **Tune the solver** | The *Solver* tab: engine (genetic algorithm, DR-ALNS, OR-Tools or Choco, for every use case; for DR-ALNS, its learning (DL) phase on or off, its duration and episodes), time limit, stall limit, seed, warm start, and the parameters of the genetic algorithm. Every field starts at its default; *Restore defaults* brings them back. For routing, also where travel times come from: straight line, road network (OpenStreetMap through OSRM) or random bounds. |
 | **Tune the constraints** | The *Constraints* tab, in two groups: *Rules*, which a plan must follow (hard), and *Objectives*, which it is scored on (medium, soft). Switch each one on or off, choose its nature and its weight; the score of the plan on screen is updated at once. A badge tells the constraints that come with the use case (*Standard*) from those added by a user (*Custom*). |
 | **Add a rule** | *+ New rule* opens the rule builder. Describe the rule in a sentence and press *Interpret*, or build it: what it applies to, the conditions that must hold and the exceptions as blocks combined with AND, OR and NOT, the nature, the weight, the penalty. The *Building blocks* on the right list everything a rule may read; click one to insert it, or drag it into a field. The structured form and its validation are shown as you type; *Test on the current plan* says who breaks the rule and runs a short optimization without and with it; *Activate rule* is available once the test has passed, after ticking a box if there are warnings. The rule then appears among the constraints, with how it behaved in the jobs that applied it, and can be removed there. |
 | **Watch the search** | *Solve* streams every improvement from the API. Items glide to their new place, what moved is listed under *What just changed*, and the score is broken down per constraint under *Where the score comes from*. |
@@ -71,6 +72,22 @@ Each use case has its own screen:
   and the safety stock; below, how full the warehouse is.
 - **Carpooling**: the trips on a map, and one timeline per driver with each pickup at the
   minute it happens and the deadline.
+- **Job shop scheduling**: a Gantt chart, by machine or by job, one bar per operation in the
+  colour of its job, with the due time of each job and the end of the last operation.
+- **Academic timetabling**: the week as a grid, by room, by teacher or by group; lessons in
+  the colour of their subject, clashes outlined, the slots a teacher cannot take hatched.
+- **BL.Optim TASP**: the week as a Gantt chart, one row per technician and one column per day
+  (office hours), activities in the colour of their nature, absences hatched; before solving,
+  the activities wait below the chart.
+- **BL.Optim VRP**: each technician's day as a route on the map, from their departure place and
+  back; beside it, the days with each technician's visits and times, work, travel and distance.
+  A day can be singled out.
+- **Stock sizing (SIAAP)**: the cost against its theoretical minimum, the six rules with how
+  often they are broken, the list of article-store series (searchable, filtered on broken
+  rules or unsolvable series) and, for the selected one, its periods: the band between stock
+  min and stock max, the stock at the start and end, the demand and the orders. Its import
+  takes the MDS and Stock files of a SIAAP export, with the store, year, length of a period
+  and number of series to keep.
 
 ## How it is built
 
@@ -87,9 +104,10 @@ static/
   js/app.js           controller: API calls, job events, playback, tabs, language and theme
   js/settings.js      solver and constraint forms, generated from GET /configuration
   js/rules.js         the rule builder: sentence, blocks, preview, checks, activation
+  js/import.js        the import dialog: required tables, example files, upload
   js/score.js         score, score analysis, cost curve
   js/util.js          DOM helpers, move animation (FLIP), drag and drop
-  js/views/           one module per use case: tasks, vrp, stock, carpool (+ the shared map)
+  js/views/           one module per use case: tasks, vrp, stock, carpool, jobshop, timetable (+ the shared map)
 ```
 
 The rule builder decides nothing either: it edits the description of a rule and shows what

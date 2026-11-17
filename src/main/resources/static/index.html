@@ -39,6 +39,7 @@
       </div>
       <div class="top-actions">
         <div class="score" id="score" aria-live="polite"></div>
+        <button class="btn ghost" id="import" type="button" data-i18n="action.import" data-i18n-title="action.import.title"></button>
         <button class="btn ghost" id="reset" type="button" data-i18n="action.reset" data-i18n-title="action.reset.title"></button>
         <button class="btn primary" id="solve" type="button"></button>
       </div>
@@ -60,6 +61,17 @@
       <div class="player-info">
         <div id="frame-label"></div>
         <div class="muted" id="status"></div>
+        <!-- Execution progress: time spent against the time limit, improvement or not -->
+        <div class="progress" id="progress" hidden>
+          <div class="progress-head">
+            <span class="progress-state" id="progress-state"></span>
+            <span class="progress-time" id="progress-time"></span>
+            <span class="progress-percent" id="progress-percent"></span>
+          </div>
+          <div class="progress-bar" id="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+            <div class="progress-fill" id="progress-fill"></div>
+          </div>
+        </div>
       </div>
       <label class="speed">
         <span class="muted" data-i18n="player.speed"></span>
